@@ -11,6 +11,7 @@ const LevelSetupManager = require('lib/LevelSetupManager')
 const ThangType = require('models/ThangType')
 const MusicPlayer = require('lib/surface/MusicPlayer')
 const storage = require('core/storage')
+const colors = require('core/colors')
 const CreateAccountModal = require('views/core/CreateAccountModal')
 const SubscribeModal = require('views/core/SubscribeModal')
 const LeaderboardModal = require('views/play/modal/LeaderboardModal')
@@ -57,6 +58,9 @@ const PROMPTED_FOR_SIGNUP = 'prompted-for-signup'
 const PROMPTED_FOR_SUBSCRIPTION = 'prompted-for-subscription'
 const AI_LEAGUE_MODAL_SHOWN = 'ai-league-modal-shown'
 const SCENARIO_MARGIN_COMPENSATION_FACTOR = 0.33 // Compensates for bottom margin when centering scenario elements
+
+const COMPLETE_STATUS = 'complete'
+const STARTED_STATUS = 'started'
 
 class LevelSessionsCollection extends CocoCollection {
   static initClass () {
@@ -128,6 +132,7 @@ class CampaignView extends RootView {
       'click [data-toggle="coco-modal"][data-target="core/CreateAccountModal"]': 'openCreateAccountModal',
       'click [data-toggle="coco-modal"][data-target="core/AnonymousTeacherModal"]': 'openAnonymousTeacherModal',
       'click #videos-button': 'onClickVideosButton',
+      'click .module-portal': 'onClickModulePortal',
     }
 
     this.prototype.shortcuts = {
@@ -151,12 +156,41 @@ class CampaignView extends RootView {
     if (this.editorMode && !this.terrain) {
       this.terrain = 'dungeon'
     }
+
+    // Only bucket/start the odyssey experiment when the user is explicitly trying to enter Junior.
+    // This avoids side-effects from random "read" code paths that just want to know a value.
+    if (this.terrain === 'junior' && !this.editorMode) {
+      const odysseyValue = me.getOrStartOdysseyExperimentValue?.()
+      if (odysseyValue === 'beta') {
+        // Use the URL API to preserve/merge query params + hash when available; fallback for older/weird URL environments.
+        try {
+          const destUrl = new URL('/play/odyssey', window.location.origin)
+          const currentUrl = new URL(window.location.href)
+          currentUrl.searchParams.forEach((value, key) => destUrl.searchParams.set(key, value))
+          if (currentUrl.hash) destUrl.hash = currentUrl.hash
+          window.tracker?.trackEvent('Redirected Junior to Odyssey', { category: 'World Map', label: 'junior' })
+          application.router.navigate(destUrl.pathname + destUrl.search + destUrl.hash, { trigger: true, replace: true })
+        } catch (e) {
+          const query = location.search || ''
+          const hash = location.hash || ''
+          window.tracker?.trackEvent('Redirected Junior to Odyssey', { category: 'World Map', label: 'junior' })
+          application.router.navigate(`/play/odyssey${query}${hash}`, { trigger: true, replace: true })
+        }
+        return
+      }
+    }
+
+    // Level completion by levelID (slug): used for UI (stars, locked state, header count). Key = session.levelID.
     this.levelStatusMap = {}
+    // Level completion by level original id: use for lookups by original (e.g. levelToUnlock). Key = session.level.original.
+    this.levelOriginalStatusMap = {}
     this.levelPlayCountMap = {}
     this.levelDifficultyMap = {}
     this.levelScoreMap = {}
+    this.moduleCampaignStatsMap = {}
     this.courseLevelsLoaded = false
     this.highlightedCampaign = null
+    this.highlightedConnectionIndex = null
 
     if (this.terrain === 'hoc-2018') {
       $('body').append($("<img src='https://code.org/api/hour/begin_codecombat_play.png' style='visibility: hidden;'>"))
@@ -500,8 +534,12 @@ class CampaignView extends RootView {
     } else {
       if (!this.editorMode) {
         for (const session of this.sessions.models) {
-          if (this.levelStatusMap[session.get('levelID')] !== 'complete') { // Don't overwrite a complete session with an incomplete one
-            this.levelStatusMap[session.get('levelID')] = session.get('state')?.complete ? 'complete' : 'started'
+          if (this.levelStatusMap[session.get('levelID')] !== COMPLETE_STATUS) { // Don't overwrite a complete session with an incomplete one
+            this.levelStatusMap[session.get('levelID')] = session.get('state')?.complete ? COMPLETE_STATUS : STARTED_STATUS
+          }
+          const levelOriginal = session.get('level')?.original
+          if (levelOriginal && this.levelOriginalStatusMap[levelOriginal] !== COMPLETE_STATUS) {
+            this.levelOriginalStatusMap[levelOriginal] = session.get('state')?.complete ? COMPLETE_STATUS : STARTED_STATUS
           }
           if (session.get('state')?.difficulty) {
             this.levelDifficultyMap[session.get('levelID')] = session.get('state').difficulty
@@ -513,6 +551,12 @@ class CampaignView extends RootView {
     if (!this.editorMode) {
       this.buildLevelScoreMap()
     }
+
+    // Module progress depends on session-derived completion maps.
+    // If module stats loaded before sessions were ready, completed counts can be cached as 0.
+    // Reset caches now that statuses are populated so next render recalculates correctly.
+    this.moduleCampaignStatsMap = {}
+
     // HoC: Fake us up a "mode" for HeroVictoryModal to return hero without levels realizing they're in a copycat campaign, or clear it if we started playing.
     if ((this.campaign?.get('type') === 'hoc') || (me.isStudent() && !this.courseInstance && (this.campaign?.get('slug') === 'intro'))) {
       application.setHocCampaign(this.campaign.get('slug'))
@@ -625,8 +669,12 @@ class CampaignView extends RootView {
       }
       if (!this.editorMode) {
         for (const session of this.sessions.models) {
-          if (this.levelStatusMap[session.get('levelID')] !== 'complete') { // Don't overwrite a complete session with an incomplete one
-            this.levelStatusMap[session.get('levelID')] = session.get('state')?.complete ? 'complete' : 'started'
+          if (this.levelStatusMap[session.get('levelID')] !== COMPLETE_STATUS) { // Don't overwrite a complete session with an incomplete one
+            this.levelStatusMap[session.get('levelID')] = session.get('state')?.complete ? COMPLETE_STATUS : STARTED_STATUS
+          }
+          const levelOriginal = session.get('level')?.original
+          if (levelOriginal && this.levelOriginalStatusMap[levelOriginal] !== COMPLETE_STATUS) {
+            this.levelOriginalStatusMap[levelOriginal] = session.get('state')?.complete ? COMPLETE_STATUS : STARTED_STATUS
           }
           if (session.get('state')?.difficulty) {
             this.levelDifficultyMap[session.get('levelID')] = session.get('state').difficulty
@@ -720,8 +768,9 @@ class CampaignView extends RootView {
     if (features.brainPop) {
       context.levels = _.filter(context.levels, level => ['dungeons-of-kithgard', 'gems-in-the-deep', 'shadow-guard', 'enemy-mine', 'true-names'].includes(level.slug))
     }
-    this.annotateLevels(context.levels)
-    const count = this.countLevels(context.levels)
+    this.annotateLevels(context.levels, context.campaign)
+    const dontCountPracticeLevels = context.campaign?.get('type') === 'junior' || context.campaign?.get('slug') === 'junior'
+    const count = this.countLevels(context.levels, context.campaign, dontCountPracticeLevels)
     if (this.courseStats) {
       context.levelsCompleted = this.courseStats.levels.numDone
       context.levelsTotal = this.courseStats.levels.size
@@ -748,6 +797,32 @@ class CampaignView extends RootView {
     context.requiresSubscription = this.requiresSubscription
     context.editorMode = this.editorMode
     context.scenarios = this.campaign?.get('scenarios') || []
+    // Modules: child campaigns rendered as portals on the map.
+    // Enrich each module with locked state: first by premium, then by levelToUnlock (complete that level to unlock).
+    const rawModules = this.campaign?.get('modules') || []
+    if (!this.editorMode) {
+      this.loadModuleCampaignStats(rawModules)
+    }
+    context.modules = rawModules.map(module => {
+      const access = module.access || 'paid'
+      const lockedByPremium = !this.editorMode && access !== 'free' && !me.isPremium()
+      const levelToUnlock = module.levelToUnlock
+      const levelNotCompleted = levelToUnlock && this.levelOriginalStatusMap[levelToUnlock] !== COMPLETE_STATUS
+      const lockedByLevel = !this.editorMode && levelNotCompleted
+      const locked = lockedByPremium || lockedByLevel
+      const moduleStats = this.editorMode ? null : this.moduleCampaignStatsMap[module.slug]
+      let lockReason = null
+      if (lockedByPremium) lockReason = 'need-premium'
+      else if (lockedByLevel) lockReason = 'need-level'
+      return {
+        ...module,
+        locked,
+        lockReason,
+        levelsTotal: moduleStats?.levelsTotal,
+        levelsCompleted: moduleStats?.levelsCompleted,
+        levelsLoading: moduleStats?.levelsLoading !== false,
+      }
+    })
     context.adjacentCampaigns = _.filter(_.values(_.cloneDeep(this.campaign?.get('adjacentCampaigns') ?? {})), ac => {
       if (me.isStudent() || me.isTeacher()) { return false }
       if (ac.showIfUnlocked && !this.editorMode) {
@@ -766,6 +841,8 @@ class CampaignView extends RootView {
     })
     context.marked = marked
     context.i18n = utils.i18n
+    context.subscribersOnlyLabel = $.i18n.t('play.subscribers_only')
+    context.lockedCampaignLabel = $.i18n.t('play.locked_campaign')
 
     if (this.campaigns) {
       context.campaigns = {}
@@ -777,11 +854,13 @@ class CampaignView extends RootView {
           if ((me.level() < 12) && (campaign.get('slug') === 'dungeon') && !this.editorMode) {
             levels = levels.filter(level => level.slug !== 'signs-and-portents')
           }
+          // Special case for some player types (see User.js for more details)
           if (me.freeOnly() && !me.isStudent()) {
             levels = levels.filter(level => !level.requiresSubscription)
           }
-          this.annotateLevels(levels)
-          const count = this.countLevels(levels)
+          this.annotateLevels(levels, campaign)
+          const dontCountPracticeLevels = campaign.get('type') === 'junior' || campaign.get('slug') === 'junior'
+          const count = this.countLevels(levels, campaign, dontCountPracticeLevels)
           campaign.levelsTotal = count.total
           campaign.levelsCompleted = count.completed
           campaign.locked = !['dungeon', 'junior'].includes(campaign.get('slug')) && (!campaign.levelsTotal || !count.unlocked)
@@ -813,6 +892,54 @@ class CampaignView extends RootView {
     }
 
     return context
+  }
+
+  loadModuleCampaignStats (modules = []) {
+    for (const module of modules) {
+      const moduleSlug = module?.slug
+      if (!moduleSlug) { continue }
+      if (this.moduleCampaignStatsMap[moduleSlug]) { continue }
+
+      this.moduleCampaignStatsMap[moduleSlug] = {
+        levelsTotal: null,
+        levelsCompleted: null,
+        levelsLoading: true,
+      }
+
+      const moduleCampaign = new Campaign({ _id: moduleSlug })
+      // Intentionally inherit practice-level counting policy from the parent campaign, not moduleCampaign.
+      // This keeps module-portal progress behavior consistent for "module-containing" campaign families
+      // (notably junior-like maps), even if an individual child campaign is marked differently.
+      const dontCountPracticeLevels = this.campaign?.get('type') === 'junior' || this.campaign?.get('slug') === 'junior'
+      const jqxhr = moduleCampaign.fetch({ data: { project: 'slug,type,name,levels' } })
+      this.supermodel.trackRequest(jqxhr)
+      jqxhr.then(
+        () => {
+          const levels = _.values($.extend(true, {}, moduleCampaign.get('levels') || {}))
+          this.annotateLevels(levels, moduleCampaign)
+          const count = this.countLevels(levels, moduleCampaign, dontCountPracticeLevels)
+          this.moduleCampaignStatsMap[moduleSlug] = {
+            levelsTotal: count.total,
+            levelsCompleted: count.completed,
+            levelsLoading: false,
+          }
+          if (!this.destroyed) {
+            this.render()
+          }
+        },
+        err => {
+          console.warn('Failed to load module campaign stats', moduleSlug, err)
+          this.moduleCampaignStatsMap[moduleSlug] = {
+            levelsTotal: null,
+            levelsCompleted: null,
+            levelsLoading: false,
+          }
+          if (!this.destroyed) {
+            this.render()
+          }
+        },
+      )
+    }
   }
 
   afterRender () {
@@ -867,14 +994,56 @@ class CampaignView extends RootView {
             if (e.scenarioOriginal) { view.trigger('scenario-moved', e) }
           })
       })
+      // Module portals: in editor, mark with an extra class for CSS targeting,
+      // and enable drag that saves the same bottom-left anchor that CSS uses
+      // (`left` / `bottom` on `.module-portal` relative to `.map`), so there
+      // is no jump when re-rendering.
+      if (this.editorMode) {
+        this.$el.find('.module-portal').addClass('in-editor')
+      }
+      // Add tooltip only for unlocked modules (locked ones stay subtle—no hover tooltip).
+      this.$el.find('.module-portal:not(.locked)').addClass('has-tooltip').tooltip()
+      this.$el.find('.module-portal').each(function () {
+        if (!me.isAdmin() || !view.editorMode) { return }
+        const el = $(this)
+        el.draggable({
+          scroll: false,
+          containment: '.map',
+          start: function () {
+            // jQuery UI draggable uses top/left. Our modules are positioned with bottom/left.
+            // Convert bottom -> top at drag start so dragging behaves correctly.
+            const map = $('.map')
+            const el = $(this)
+            const bottomPx = parseFloat(el.css('bottom')) || 0
+            const topPx = map.height() - bottomPx - el.outerHeight()
+            el.css({ top: topPx, bottom: 'auto' })
+          },
+          stop: function () {
+            // Convert top -> bottom on drop, and persist bottom/left percentages.
+            const map = $('.map')
+            const el = $(this)
+            const leftPx = el.offset().left - map.offset().left
+            const topPx = el.offset().top - map.offset().top
+            const bottomPx = map.height() - (topPx + el.outerHeight())
+            const x = (100 * leftPx / map.width())
+            const y = (100 * bottomPx / map.height())
+            // Snap back to bottom/left positioning so the DOM matches what we persist.
+            el.css({ left: `${x}%`, bottom: `${y}%`, top: 'auto' })
+            const e = { position: { x, y }, moduleSlug: el.data('module-slug') }
+            if (e.moduleSlug) { view.trigger('module-moved', e) }
+          },
+        })
+      })
     }
     this.updateVolume()
     this.updateHero()
     if (!window.currentModal && this.fullyRendered) {
       this.highlightNextLevel()
       if (this.editorMode) {
-        this.createLines()
+        this.createLinesForEditor()
       }
+      // Visual connections are shown in both editor and play modes.
+      this.createVisualConnections()
       if (this.options.showLeaderboard) {
         this.showLeaderboard(this.options.justBeatLevel?.get('slug'))
       } else if (this.shouldShow('promotion')) {
@@ -1047,7 +1216,7 @@ class CampaignView extends RootView {
     return collapsedLevels
   }
 
-  annotateLevels (orderedLevels) {
+  annotateLevels (orderedLevels, campaign = this.campaign) {
     if (this.isClassroom()) { return }
 
     for (let levelIndex = 0; levelIndex < orderedLevels.length; levelIndex++) {
@@ -1056,21 +1225,23 @@ class CampaignView extends RootView {
       level.locked = !me.ownsLevel(level.original)
       if ((level.slug === 'kithgard-mastery') && (this.calculateExperienceScore() === 0)) { level.locked = true }
       if (level.requiresSubscription && this.requiresSubscription && me.isInHourOfCode()) { level.locked = true }
-      if (['started', 'complete'].includes(this.levelStatusMap[level.slug])) { level.locked = false }
+      if ([STARTED_STATUS, COMPLETE_STATUS].includes(this.levelStatusMap[level.slug])) { level.locked = false }
       if (this.editorMode) { level.locked = false }
-      if (['Auditions', 'Intro'].includes(this.campaign?.get('name'))) { level.locked = false }
+      if (['Auditions', 'Intro'].includes(campaign?.get('name'))) { level.locked = false }
       if (me.isInGodMode()) { level.locked = false }
       if (this.courseInstanceID && level.hasAccessByTeacher(this.courseTeacher)) { level.locked = false }
-      if (level.adminOnly && !['started', 'complete'].includes(this.levelStatusMap[level.slug])) { level.disabled = true }
+      if (level.adminOnly && ![STARTED_STATUS, COMPLETE_STATUS].includes(this.levelStatusMap[level.slug])) { level.disabled = true }
       if (me.isInGodMode()) { level.disabled = false }
 
-      level.color = 'rgb(255, 80, 60)'
-      if (!this.isClassroom() && (this.campaign?.get('type') !== 'hoc')) {
-        if (level.requiresSubscription) { level.color = 'rgb(80, 130, 200)' }
+      level.color = colors.jayBlue
+      if (this.editorMode && !level.requiresSubscription) {
+        level.color = colors.lightBlue
       }
-      // level.color = 'rgb(200, 80, 200)' if level.adventurer  # Disable adventurer stuff for now
-
-      if (level.locked) { level.color = 'rgb(193, 193, 193)' }
+      if (level.locked) {
+        level.color = colors.sparkySilver
+      } else if (this.isLevelCompleted(level)) {
+        level.color = colors.darkGreen
+      }
       level.unlocksHero = level.rewards?.find(r => r.hero)?.hero
       if (level.unlocksHero) {
         level.purchasedHero = me.get('purchased')?.heroes?.includes(level.unlocksHero)
@@ -1084,7 +1255,7 @@ class CampaignView extends RootView {
         level.unlocksPet = false
       }
 
-      level.hidden = level.locked && (this.campaign?.get('type') !== 'hoc')
+      level.hidden = level.locked && (campaign?.get('type') !== 'hoc')
       if (level.concepts?.length) {
         level.displayConcepts = level.concepts
         const maxConcepts = 6
@@ -1113,27 +1284,29 @@ class CampaignView extends RootView {
     return null
   }
 
-  countLevels (orderedLevels) {
+  countLevels (orderedLevels, campaign, ignorePracticeLevels = false) {
     const count = { total: 0, completed: 0, unlocked: 0 }
 
-    if (this.campaign?.get('type') === 'hoc') {
+    if (campaign?.get('type') === 'hoc') {
       // HoC: Just order left-to-right instead of looking at unlocks, which we don't use for this copycat campaign
       orderedLevels = _.sortBy(orderedLevels, level => level.position.x)
       for (const level of orderedLevels) {
-        if (this.levelStatusMap[level.slug] === 'complete') { count.completed++ }
+        if (ignorePracticeLevels && level.practice) { continue }
+        if (this.levelStatusMap[level.slug] === COMPLETE_STATUS) { count.completed++ }
         if (!level.locked) { ++count.unlocked }
+        ++count.total
       }
-      count.total = orderedLevels.length
       return count
     }
 
     for (let levelIndex = 0; levelIndex < orderedLevels.length; levelIndex++) {
       const level = orderedLevels[levelIndex]
-      if (level.locked == null) { this.annotateLevels(orderedLevels) } // Annotate if we haven't already.
+      if (level.locked == null) { this.annotateLevels(orderedLevels, campaign) } // Annotate if we haven't already.
+      if (ignorePracticeLevels && level.practice) { continue }
       if (!level.locked) { ++count.unlocked }
       if (level.disabled) { continue }
-      const completed = this.levelStatusMap[level.slug] === 'complete'
-      const started = this.levelStatusMap[level.slug] === 'started'
+      const completed = this.levelStatusMap[level.slug] === COMPLETE_STATUS
+      const started = this.levelStatusMap[level.slug] === STARTED_STATUS
       if ((level.unlockedInSameCampaign || !level.locked) && (started || completed || !(level.locked && level.practice && /-[a-z]$/.test(level.slug)))) {
         ++count.total
       }
@@ -1152,6 +1325,10 @@ class CampaignView extends RootView {
     return this.courseInstanceID != null
   }
 
+  isLevelCompleted (level) {
+    return this.levelStatusMap[level.slug] === COMPLETE_STATUS
+  }
+
   determineNextLevel (orderedLevels) {
     if (this.isClassroom()) {
       if (this.courseStats) { this.applyCourseLogicToLevels(orderedLevels) }
@@ -1165,14 +1342,14 @@ class CampaignView extends RootView {
       // HoC: Just order left-to-right instead of looking at unlocks, which we don't use for this copycat campaign
       orderedLevels = _.sortBy(orderedLevels, level => level.position.x)
       for (const level of orderedLevels) {
-        if (this.levelStatusMap[level.slug] !== 'complete') {
+        if (this.levelStatusMap[level.slug] !== COMPLETE_STATUS) {
           level.next = true
           // Unlock and re-annotate this level
           // May not be unlocked/awarded due to different HoC progression using mostly shared levels
           level.locked = false
           level.hidden = level.locked
           level.disabled = false
-          level.color = 'rgb(255, 80, 60)'
+          level.color = colors.jayBlue
           return
         }
       }
@@ -1198,7 +1375,7 @@ class CampaignView extends RootView {
         // }
 
         // Should we point this level out?
-        if (!nextLevel.disabled && (this.levelStatusMap[nextLevel.slug] !== 'complete') && !dontPointTo.includes(nextLevel.slug) &&
+        if (!nextLevel.disabled && (this.levelStatusMap[nextLevel.slug] !== COMPLETE_STATUS) && !dontPointTo.includes(nextLevel.slug) &&
         !nextLevel.replayable && (
           me.isPremium() || !nextLevel.requiresSubscription || // nextLevel.adventurer or  # Disable adventurer stuff for now
           _.any(subscriptionPrompts, prompt => (nextLevel.slug === prompt.slug) && !this.levelStatusMap[prompt.unless])
@@ -1239,7 +1416,7 @@ class CampaignView extends RootView {
       if (!foundNext) { foundNext = findNextLevel(level, false) }
     }
 
-    if (!foundNext && orderedLevels[0] && !orderedLevels[0].locked && (this.levelStatusMap[orderedLevels[0].slug] !== 'complete')) {
+    if (!foundNext && orderedLevels[0] && !orderedLevels[0].locked && (this.levelStatusMap[orderedLevels[0].slug] !== COMPLETE_STATUS)) {
       orderedLevels[0].next = true
     }
   }
@@ -1263,12 +1440,22 @@ class CampaignView extends RootView {
     return experienceScore
   }
 
-  createLines () {
+  createLinesForEditor () {
     for (const level of this.campaign?.renderedLevels || []) {
-      for (const nextLevelOriginal of level.nextLevels || []) {
+      let connections = level.connections || []
+      connections = connections.filter(connection => connection.toLevel)
+      for (const connection of connections) {
+        const toLevel = _.find(this.campaign.renderedLevels, { original: connection.toLevel })
+        if (toLevel) {
+          this.createLineForEditor(level.position, toLevel.position)
+        }
+      }
+      if (connections.length) continue // If there are connections, we don't need to draw next levels
+      const nextLevels = level.nextLevels || []
+      for (const nextLevelOriginal of nextLevels) {
         const nextLevel = _.find(this.campaign.renderedLevels, { original: nextLevelOriginal })
         if (nextLevel) {
-          this.createLine(level.position, nextLevel.position)
+          this.createLineForEditor(level.position, nextLevel.position)
         }
       }
     }
@@ -1288,14 +1475,14 @@ class CampaignView extends RootView {
           const toPos = to?.position
           if (toPos) {
             // If connection is marked invisible, render as a thinner line instead of skipping
-            this.createLine(fromPos, toPos, { thin: !!conn?.invisible })
+            this.createLineForEditor(fromPos, toPos, { thin: !!conn?.invisible })
           }
         }
       }
     }
   }
 
-  createLine (o1, o2, options = {}) {
+  createLineForEditor (o1, o2, options = {}) {
     const mapHeight = parseFloat($('.map').css('height'))
     const mapWidth = parseFloat($('.map').css('width'))
     if (!(mapHeight > 0)) { return }
@@ -1307,6 +1494,283 @@ class CampaignView extends RootView {
     const transform = `translateY(-50%) translateX(-50%) rotate(${angle}deg) translateX(50%)`
     const line = $('<div>').appendTo('.map').addClass('next-level-line').toggleClass('thin-connection', !!options.thin).css({ transform, width: length + '%', left: o1.x + '%', bottom: (o1.y - 0.5) + '%' })
     return line.append($('<div class="line">')).append($('<div class="point">'))
+  }
+
+  createVisualConnections () {
+    const visualConnections = this.campaign?.get('visualConnections') || []
+    if (!visualConnections.length) { return }
+
+    const map = this.$el.find('.map')
+    if (!map.length) { return }
+
+    // Clear any existing layer (we use a fixed id to avoid duplicates)
+    map.find('#visual-connections-svg').remove()
+    this.$el.find('.visual-connection-handle').remove()
+
+    // Use actual pixel size of the map as the SVG coordinate system
+    const mapWidth = map.width()
+    const mapHeight = map.height()
+    if (!(mapWidth > 0 && mapHeight > 0)) { return }
+
+    const svgNS = 'http://www.w3.org/2000/svg'
+    const svg = document.createElementNS(svgNS, 'svg')
+    $(svg)
+      .attr({
+        id: 'visual-connections-svg',
+        width: mapWidth,
+        height: mapHeight,
+      })
+      .css({
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: mapWidth,
+        height: mapHeight,
+        'pointer-events': 'none',
+        // Render visual connections beneath level markers/flags (z-index 2) but above the map background.
+        'z-index': 1,
+      })
+
+    // Defaults from appearance-based colors; functional meaning only at use site
+    const defaultConnectionColor = colors.black
+    const defaultLockedColor = colors.grey
+    const defaultCompleteColor = colors.lightGold
+    const defaultActiveColor = colors.red
+    const defaultOpacity = 0.7
+
+    // Convert 0–100% campaign coords -> pixels in this SVG.
+    // X is from left; Y is from bottom (like level positions), so we flip it
+    // before mapping into the SVG's top-left–based pixel space.
+    const mapToSvgX = xPercent => (xPercent / 100) * mapWidth
+    const mapToSvgY = yPercentFromBottom => {
+      const yPercentFromTop = 100 - yPercentFromBottom
+      return (yPercentFromTop / 100) * mapHeight
+    }
+
+    // Container for per-path markers (arrow heads, etc.)
+    const defs = document.createElementNS(svgNS, 'defs')
+    svg.appendChild(defs)
+
+    let connectionIndex = 0
+    for (const conn of visualConnections) {
+      const fromPos = conn?.fromPos
+      const toPos = conn?.toPos
+      if (!fromPos || !toPos) continue
+
+      const x1 = mapToSvgX(fromPos.x)
+      const y1 = mapToSvgY(fromPos.y)
+      const x2 = mapToSvgX(toPos.x)
+      const y2 = mapToSvgY(toPos.y)
+
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const length = Math.hypot(dx, dy) || 1
+
+      const nx = -dy / length
+      const ny = dx / length
+      const mx = (x1 + x2) / 2
+      const my = (y1 + y2) / 2
+
+      // Curve: 0 = straight. Signed curve scales curvature linearly.
+      const curve = conn.curve || 0
+      const k = 0.18
+      const mag = k * length * curve
+
+      const cx = mx + nx * mag
+      const cy = my + ny * mag
+
+      const d = `M ${x1},${y1} Q ${cx},${cy} ${x2},${y2}`
+
+      // Connection color by unlock/complete level status (editor mode uses conn.color only)
+      let color = conn.color || defaultConnectionColor
+      if (!this.editorMode) {
+        const unlockOriginal = conn.unlockLevelOriginal
+        const completeOriginal = conn.completeLevelOriginal
+        const unlockCompleted = unlockOriginal && this.levelOriginalStatusMap[unlockOriginal] === COMPLETE_STATUS
+        const completeCompleted = completeOriginal && this.levelOriginalStatusMap[completeOriginal] === COMPLETE_STATUS
+        if (unlockOriginal && !unlockCompleted) {
+          color = conn.lockedColor || defaultLockedColor
+        } else if (completeOriginal && completeCompleted) {
+          color = conn.completeColor || defaultCompleteColor
+        } else if (unlockCompleted) {
+          color = conn.activeColor || defaultActiveColor
+        }
+      }
+      const opacity = (conn.opacity != null) ? conn.opacity : defaultOpacity
+      // Thickness is relative to map height: 1 = 1% of map height
+      const thickness = conn.thickness != null ? conn.thickness : 1
+      const strokeWidth = (mapHeight * thickness) / 100
+
+      const path = document.createElementNS(svgNS, 'path')
+      $(path).attr({
+        d,
+        fill: 'none',
+        stroke: color,
+        'stroke-opacity': opacity,
+        'stroke-width': strokeWidth,
+        'stroke-linecap': 'round',
+      })
+      if (this.editorMode && me.isAdmin()) {
+        path.setAttribute('data-connection-index', connectionIndex)
+      }
+
+      // In editor mode, create draggable HTML handles and helper lines to unlock/complete levels.
+      if (this.editorMode && me.isAdmin()) {
+        const handleSize = 16
+        const makeHandle = (x, y, end) => {
+          const $handle = $('<div class="visual-connection-handle">')
+            .css({
+              left: (x - handleSize / 2) + 'px',
+              top: (y - handleSize / 2) + 'px',
+              width: handleSize,
+              height: handleSize,
+            })
+            .attr({
+              'data-connection-index': connectionIndex,
+              'data-connection-end': end,
+            })
+          map.append($handle)
+        }
+        makeHandle(x1, y1, 'from')
+        makeHandle(x2, y2, 'to')
+
+        // Helper lines: connection start -> unlock level, connection end -> complete level (solid, visible).
+        const levels = this.getLevels() || {}
+        const helperStroke = colors.black
+        const helperStrokeWidth = 2
+        const helperOpacity = 0.8
+        if (conn.unlockLevelOriginal) {
+          const level = levels[conn.unlockLevelOriginal]
+          if (level?.position) {
+            const lx = mapToSvgX(level.position.x)
+            const ly = mapToSvgY(level.position.y)
+            const helperPath = document.createElementNS(svgNS, 'path')
+            $(helperPath).attr({
+              d: `M ${x1},${y1} L ${lx},${ly}`,
+              fill: 'none',
+              stroke: helperStroke,
+              'stroke-width': helperStrokeWidth,
+              'stroke-opacity': helperOpacity,
+            })
+            svg.appendChild(helperPath)
+          }
+        }
+        if (conn.completeLevelOriginal) {
+          const level = levels[conn.completeLevelOriginal]
+          if (level?.position) {
+            const lx = mapToSvgX(level.position.x)
+            const ly = mapToSvgY(level.position.y)
+            const helperPath = document.createElementNS(svgNS, 'path')
+            $(helperPath).attr({
+              d: `M ${x2},${y2} L ${lx},${ly}`,
+              fill: 'none',
+              stroke: helperStroke,
+              'stroke-width': helperStrokeWidth,
+              'stroke-opacity': helperOpacity,
+            })
+            svg.appendChild(helperPath)
+          }
+        }
+      }
+
+      // Optional head decoration
+      if (conn.head === 'arrow') {
+        const markerId = `visual-connection-arrow-${connectionIndex}`
+        const marker = document.createElementNS(svgNS, 'marker')
+        $(marker).attr({
+          id: markerId,
+          viewBox: '0 0 10 10',
+          refX: 5,
+          refY: 5,
+          // Slightly smaller arrowhead than the manual test version
+          markerWidth: 3,
+          markerHeight: 3,
+          orient: 'auto-start-reverse',
+        })
+        const arrowPath = document.createElementNS(svgNS, 'path')
+        $(arrowPath).attr({
+          d: 'M 0 0 L 10 5 L 0 10 z',
+          fill: color,
+        })
+        marker.appendChild(arrowPath)
+        defs.appendChild(marker)
+        $(path).attr('marker-end', `url(#${markerId})`)
+      }
+
+      svg.appendChild(path)
+      connectionIndex++
+    }
+
+    map.append(svg)
+
+    // Wire up draggable handles after they exist in the DOM.
+    if (this.editorMode && me.isAdmin()) {
+      const view = this
+      this.$el.find('.visual-connection-handle').draggable({
+        scroll: false,
+        containment: '.map',
+        stop: function () {
+          const mapEl = view.$el.find('.map')
+          const handle = $(this)
+          const centerX = (handle.offset().left - mapEl.offset().left) + (handle.outerWidth() / 2)
+          const centerY = (handle.offset().top - mapEl.offset().top) + (handle.outerHeight() / 2)
+          const xPercent = (centerX / mapEl.width()) * 100
+          const yPercentFromBottom = (1 - (centerY / mapEl.height())) * 100
+          const index = handle.data('connection-index')
+          const end = handle.data('connection-end')
+          // Let the CampaignEditorView own the actual data mutation, like levels/modules.
+          view.trigger('visual-connection-end-moved', {
+            index,
+            end,
+            position: { x: xPercent, y: yPercentFromBottom },
+          })
+        },
+      })
+    }
+
+    // Work around Chrome’s dynamic SVG marker rendering bug:
+    const $svg = map.find('#visual-connections-svg')
+    const html = $svg[0].outerHTML
+    $svg.replaceWith(html)
+
+    if (this.editorMode && me.isAdmin()) {
+      const $svg = this.$el.find('.map #visual-connections-svg')
+      $svg.find('path[data-connection-index]').each(function () {
+        const el = this
+        const c = (el.getAttribute('class') || '').replace(/\s*connection-highlighted\s*/g, ' ').trim()
+        el.setAttribute('class', c)
+      })
+      if (this.highlightedConnectionIndex != null) {
+        const $target = $svg.find(`path[data-connection-index="${this.highlightedConnectionIndex}"]`)
+        if ($target.length) {
+          const el = $target[0]
+          const c = (el.getAttribute('class') || '').trim()
+          el.setAttribute('class', (c ? c + ' ' : '') + 'connection-highlighted')
+        }
+      }
+    }
+  }
+
+  setHighlightedConnection (index) {
+    if (!this.editorMode) { return }
+    this.highlightedConnectionIndex = index == null ? null : index
+    const $svg = this.$el.find('.map #visual-connections-svg')
+    if (!$svg.length) { return }
+    const $paths = $svg.find('path[data-connection-index]')
+    if (!$paths.length) { return }
+    $paths.each(function () {
+      const el = this
+      const c = (el.getAttribute('class') || '').replace(/\s*connection-highlighted\s*/g, ' ').trim()
+      el.setAttribute('class', c)
+    })
+    if (this.highlightedConnectionIndex != null) {
+      const $target = $svg.find(`path[data-connection-index="${this.highlightedConnectionIndex}"]`)
+      if ($target.length) {
+        const el = $target[0]
+        const c = (el.getAttribute('class') || '').trim()
+        el.setAttribute('class', (c ? c + ' ' : '') + 'connection-highlighted')
+      }
+    }
   }
 
   applyCampaignStyles () {
@@ -1464,37 +1928,13 @@ class CampaignView extends RootView {
     const levelName = levelElement.data('level-name')
     const level = _.find(_.values(this.getLevels()), { slug: levelSlug })
 
-    let defaultAccess = me.get('hourOfCode') || (this.campaign?.get('type') === 'hoc') || (this.campaign?.get('slug') === 'intro') ? 'long' : 'short'
-    if (new Date(me.get('dateCreated')) < new Date('2021-09-21')) {
-      defaultAccess = 'all'
-    }
-    let access
-    if (this.terrain === 'junior') {
-      access = 'all' // CodeCombat Junior level access is managed the old way, with level.requiresSubscription, no hardcoded overrides
-    }
-    access = access || me.getExperimentValue('home-content', defaultAccess)
-    if (me.showChinaResourceInfo() || (me.get('country') === 'japan')) {
-      access = 'short'
-    }
-    const freeAccessLevels = utils.freeAccessLevels
-      .filter(fal => {
-        if (fal.access === 'short') return true
-        if (fal.access === 'medium' && ['medium', 'long', 'extended'].includes(access)) return true
-        if (fal.access === 'long' && ['long', 'extended'].includes(access)) return true
-        if (fal.access === 'extended' && access === 'extended') return true
-        return false
-      })
-      .map(fal => fal.slug)
-
-    const requiresSubscription = level.requiresSubscription || ((access !== 'all') && !freeAccessLevels.includes(level.slug))
     const canPlayAnyway = [
       !this.requiresSubscription,
-      // level.adventurer  # Disable adventurer stuff for now
       this.levelStatusMap[level.slug],
       this.campaign.get('type') === 'hoc',
     ].some(Boolean)
 
-    if (requiresSubscription && !canPlayAnyway) {
+    if (level.requiresSubscription && !canPlayAnyway) {
       return this.promptForSubscription(levelSlug, 'map level clicked')
     } else {
       this.startLevel({ levelSlug, levelOriginal, levelPath, levelName })
@@ -1529,6 +1969,7 @@ class CampaignView extends RootView {
     const classroomLevel = this.classroomLevelMap?.[levelOriginal]
     const session = this.preloadedSession?.loaded && this.preloadedSession.levelSlug === levelSlug ? this.preloadedSession : null
     const codeLanguage = classroomLevel?.get('primerLanguage') || this.classroom?.get('aceConfig')?.language || session?.get('codeLanguage')
+    const fromCampaign = this.campaign?.get('slug') || this.terrain
     const options = {
       supermodel: this.supermodel,
       levelID: levelSlug,
@@ -1541,6 +1982,7 @@ class CampaignView extends RootView {
       courseID,
       courseInstanceID,
       codeLanguage,
+      fromCampaign,
     }
     this.setupManager = new LevelSetupManager(options)
     if (!this.setupManager?.navigatingToPlay) {
@@ -1636,6 +2078,10 @@ class CampaignView extends RootView {
     this.$el.find('.map').css({ width: resultingWidth, height: resultingHeight, 'margin-left': resultingMarginX, 'margin-top': resultingMarginY })
     if (this.pointerInterval) {
       this.highlightNextLevel()
+    }
+    // Rebuild visual connections so they stay aligned with the resized map.
+    if (this.campaign) {
+      this.createVisualConnections()
     }
   }
 
@@ -1733,9 +2179,10 @@ class CampaignView extends RootView {
   onClickBack (e) {
     let route = '/play'
     let viewArgs = [{ supermodel: this.supermodel }]
-    if (this.campaign?.get('isHackstackCampaign')) {
-      route = '/play/ai'
-      viewArgs = [{ supermodel: this.supermodel }, 'ai'] // Pass 'ai' as the campaign parameter
+    const parentSlug = this.campaign?.get('parentCampaignSlug')
+    if (parentSlug) {
+      route = `/play/${parentSlug}`
+      viewArgs = [{ supermodel: this.supermodel }, parentSlug]
     }
     Backbone.Mediator.publish('router:navigate', {
       route,
@@ -1777,6 +2224,27 @@ class CampaignView extends RootView {
       route: `/play/${campaignSlug}`,
       viewClass: CampaignView,
       viewArgs: [{ supermodel: this.supermodel }, campaignSlug],
+    })
+  }
+
+  onClickModulePortal (e) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (this.editorMode) { return }
+    const $target = $(e.currentTarget)
+    const moduleSlug = $target.data('module-slug')
+    if (!moduleSlug) { return }
+    if ($target.hasClass('locked')) {
+      const lockReason = $target.data('lock-reason')
+      if (lockReason === 'need-premium') {
+        return this.promptForSubscription(moduleSlug, 'locked module clicked')
+      }
+      return
+    }
+    Backbone.Mediator.publish('router:navigate', {
+      route: `/play/${moduleSlug}`,
+      viewClass: CampaignView,
+      viewArgs: [{ supermodel: this.supermodel }, moduleSlug],
     })
   }
 
@@ -1943,6 +2411,8 @@ class CampaignView extends RootView {
       const sessionsCompleteMap = Object.fromEntries(sessionsComplete)
 
       const campaignLevels = this.getLevels()
+      // If this campaign has no levels loaded (or no levels at all), skip earned-levels fixup.
+      if (!campaignLevels) { return }
 
       const levelsEarned = me.get('earned')?.levels
         ?.filter(levelOriginal => campaignLevels[levelOriginal])
@@ -2009,7 +2479,7 @@ class CampaignView extends RootView {
         level.hidden = false
         level.next = true
         found = true
-      } else if (['started', 'complete'].includes(playerState)) {
+      } else if ([STARTED_STATUS, COMPLETE_STATUS].includes(playerState)) {
         level.hidden = false
         level.locked = false
       } else {
@@ -2026,7 +2496,7 @@ class CampaignView extends RootView {
           }
         } else if (level.assessment) {
           level.hidden = false
-          level.locked = this.levelStatusMap[lastNormalLevel?.slug] !== 'complete'
+          level.locked = this.levelStatusMap[lastNormalLevel?.slug] !== COMPLETE_STATUS
         } else {
           level.locked = found
           level.hidden = false
@@ -2058,15 +2528,17 @@ class CampaignView extends RootView {
       }
 
       if (level.locked) {
-        level.color = 'rgb(193, 193, 193)'
-      } else if (level.practice) {
-        level.color = 'rgb(45, 145, 81)'
-      } else if (level.assessment) {
-        level.color = '#AD62F8'
-        if (playerState !== 'complete') {
-          level.noFlag = false
-        }
+        level.color = colors.sparkySilver
+      } else if (this.isLevelCompleted(level)) {
+        level.color = colors.darkGreen
       }
+      // else if (level.practice) {
+      //   level.color = colors.seaGreen
+      // } else if (level.assessment) {
+      //   level.color = colors.mysticViolet
+      //   if (playerState !== COMPLETE_STATUS) {
+      //     level.noFlag = false
+      //   }
       level.unlocksHero = false
       level.unlocksItem = false
       prev = level
@@ -2229,7 +2701,7 @@ class CampaignView extends RootView {
     }
 
     if (what === 'hackstack-menu-icon') {
-      return !userUtils.isCreatedViaLibrary() && !this.editorMode
+      return !userUtils.isCreatedViaLibrary() && !this.editorMode && !me.isStudent() && !me.isTeacher()
     }
 
     if (what === 'cchome-menu-icon') {

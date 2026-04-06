@@ -52,7 +52,7 @@ export const items = {
   AP_CSP: { url: cocoPath('/apcsp'), title: 'nav.ap_csp' },
   AI_LEAGUE: { url: cocoPath('/league'), title: 'nav.ai_league_esports' },
   ROBLOX: { url: cocoPath('/roblox'), title: 'nav.codecombat_worlds_on_roblox' },
-  AI_HACKSTACK: { url: cocoPath('/ai'), title: 'nav.ai_hackstack' },
+  AI_HACKSTACK: { url: cocoPath('/ai/play'), title: 'nav.ai_hackstack' },
   AI_JUNIOR: { url: 'https://docs.google.com/forms/d/e/1FAIpQLSfcWo6JVeFP30OslksUwE1Z-XyWFIKW3h81v08aYU1-vbhSUA/viewform', attrs: { target: '_blank' }, title: 'nav.ai_junior_beta' },
   LIVE_ONLINE_CLASSES: { url: cocoPath('/parents'), title: 'nav.live_online_classes' },
   PREMIUM: { url: cocoPath('/premium'), title: 'nav.premium_self_paced' },
@@ -545,8 +545,6 @@ export default Vue.extend({
                     a.account-dropdown-item(href="/partner-dashboard", target="_blank") {{ $t('nav.api_dashboard') }}
                   li(v-if="me.isAdmin() || me.isOnlineTeacher() || me.isParentAdmin()")
                     a.account-dropdown-item(href="/admin") {{ $t('account_settings.admin') }}
-                  li(v-if="me.isAdmin() || me.isOnlineTeacher()")
-                    a.account-dropdown-item(href="/event-calendar/classes") {{ $t('events.calendar') }}
                   li(v-if="serverSession && serverSession.amActually")
                     a.account-dropdown-item#nav-stop-spying-button(href="#") Stop Spying
                   li(v-if="me.isTeacher()")

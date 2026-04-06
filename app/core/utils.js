@@ -19,7 +19,7 @@ const isCodeCombat = product === 'codecombat'
 const isOzaria = !isCodeCombat
 const _ = require('lodash')
 const useWebsocket = false
-const showOzaria =  () => isOzaria || window.location.pathname.includes('ozaria')
+const showOzaria = () => isOzaria || window.location.pathname.includes('ozaria')
 
 // Yuqiang: i don't know why we use same slugify from different source but let's keep it right now since change it sometimes trigger unbelievable bug
 if (isCodeCombat) {
@@ -230,15 +230,29 @@ const OZ_COURSE_IDS_MAP = {
 }
 const HACKSTACK_COURSE_IDS_MAP = {
   INTRO_TO_AI: '69848429268d20956ac05832',
-  ENGLISH_LANGUAGE_ARTS: '69848429268d20956ac05838',
-  MATH_AND_STATISTICS: '6984842a268d20956ac0583d',
-  CAREER_READINESS: '6984842b268d20956ac05840',
   ARTIFICIAL_INTELLIGENCE_1: '6984842b268d20956ac05843',
-  COMPUTER_SCIENCE: '6984842c268d20956ac05846',
   ARTIFICIAL_INTELLIGENCE_2: '6984842d268d20956ac05849',
+  ALGEBRA: '6984842a268d20956ac0583d',
+  CAREER_READINESS: '6984842b268d20956ac05840',
   CAREER_READINESS_2: '6984842d268d20956ac0584c',
-  AI_SANDBOX: '6984842e268d20956ac0584f',
+  ENGLISH_LANGUAGE_ARTS: '69848429268d20956ac05838',
+  COMPUTER_SCIENCE: '6984842c268d20956ac05846',
   AI_EXPLORATIONS: '6984842f268d20956ac05852',
+  AI_SANDBOX: '6984842e268d20956ac0584f',
+}
+
+const COCO_COURSE_IDS_MAP = {
+  INTRODUCTION_TO_COMPUTER_SCIENCE: '560f1a9f22961295f9427742',
+  GAME_DEVELOPMENT_1: '5789587aad86a6efb573701e',
+  WEB_DEVELOPMENT_1: '5789587aad86a6efb573701f',
+  COMPUTER_SCIENCE_2: '5632661322961295f9428638',
+  GAME_DEVELOPMENT_2: '57b621e7ad86a6efb5737e64',
+  WEB_DEVELOPMENT_2: '5789587aad86a6efb5737020',
+  COMPUTER_SCIENCE_3: '56462f935afde0c6fd30fc8c',
+  GAME_DEVELOPMENT_3: '5a0df02b8f2391437740f74f',
+  COMPUTER_SCIENCE_4: '56462f935afde0c6fd30fc8d',
+  COMPUTER_SCIENCE_5: '569ed916efa72b0ced971447',
+  COMPUTER_SCIENCE_6: '5817d673e85d1220db624ca4',
 }
 
 if (isCodeCombat) {
@@ -253,19 +267,9 @@ if (isCodeCombat) {
 
   courseIDs = {
     JUNIOR: '65f32b6c87c07dbeb5ba1936',
-    HACKSTACK: '663b25f11c568468efc8adde',
-    INTRODUCTION_TO_COMPUTER_SCIENCE: '560f1a9f22961295f9427742',
-    GAME_DEVELOPMENT_1: '5789587aad86a6efb573701e',
-    WEB_DEVELOPMENT_1: '5789587aad86a6efb573701f',
-    COMPUTER_SCIENCE_2: '5632661322961295f9428638',
-    GAME_DEVELOPMENT_2: '57b621e7ad86a6efb5737e64',
-    WEB_DEVELOPMENT_2: '5789587aad86a6efb5737020',
-    COMPUTER_SCIENCE_3: '56462f935afde0c6fd30fc8c',
-    GAME_DEVELOPMENT_3: '5a0df02b8f2391437740f74f',
-    COMPUTER_SCIENCE_4: '56462f935afde0c6fd30fc8d',
-    COMPUTER_SCIENCE_5: '569ed916efa72b0ced971447',
-    COMPUTER_SCIENCE_6: '5817d673e85d1220db624ca4',
+    ...COCO_COURSE_IDS_MAP,
     ...HACKSTACK_COURSE_IDS_MAP,
+    HACKSTACK: '663b25f11c568468efc8adde',
   }
 
   coursesWithProjects = [
@@ -304,7 +308,16 @@ if (isCodeCombat) {
     courseIDs.COMPUTER_SCIENCE_4,
     courseIDs.COMPUTER_SCIENCE_5,
     courseIDs.COMPUTER_SCIENCE_6,
-    courseIDs.HACKSTACK,
+    courseIDs.INTRO_TO_AI,
+    courseIDs.ARTIFICIAL_INTELLIGENCE_1,
+    courseIDs.ARTIFICIAL_INTELLIGENCE_2,
+    courseIDs.ALGEBRA,
+    courseIDs.CAREER_READINESS,
+    courseIDs.CAREER_READINESS_2,
+    courseIDs.ENGLISH_LANGUAGE_ARTS,
+    courseIDs.COMPUTER_SCIENCE,
+    courseIDs.AI_EXPLORATIONS,
+    courseIDs.AI_SANDBOX,
   ]
   otherOrderedCourseIDs = [
     otherCourseIDs.CHAPTER_ONE,
@@ -330,19 +343,9 @@ if (isCodeCombat) {
 
   otherCourseIDs = {
     JUNIOR: '65f32b6c87c07dbeb5ba1936',
-    HACKSTACK: '663b25f11c568468efc8adde',
-    INTRODUCTION_TO_COMPUTER_SCIENCE: '560f1a9f22961295f9427742',
-    GAME_DEVELOPMENT_1: '5789587aad86a6efb573701e',
-    WEB_DEVELOPMENT_1: '5789587aad86a6efb573701f',
-    COMPUTER_SCIENCE_2: '5632661322961295f9428638',
-    GAME_DEVELOPMENT_2: '57b621e7ad86a6efb5737e64',
-    WEB_DEVELOPMENT_2: '5789587aad86a6efb5737020',
-    COMPUTER_SCIENCE_3: '56462f935afde0c6fd30fc8c',
-    GAME_DEVELOPMENT_3: '5a0df02b8f2391437740f74f',
-    COMPUTER_SCIENCE_4: '56462f935afde0c6fd30fc8d',
-    COMPUTER_SCIENCE_5: '569ed916efa72b0ced971447',
-    COMPUTER_SCIENCE_6: '5817d673e85d1220db624ca4',
+    ...COCO_COURSE_IDS_MAP,
     ...HACKSTACK_COURSE_IDS_MAP,
+    HACKSTACK: '663b25f11c568468efc8adde',
   }
 
   CSCourseIDs = [
@@ -371,7 +374,16 @@ if (isCodeCombat) {
     otherCourseIDs.COMPUTER_SCIENCE_4,
     otherCourseIDs.COMPUTER_SCIENCE_5,
     otherCourseIDs.COMPUTER_SCIENCE_6,
-    otherCourseIDs.HACKSTACK,
+    otherCourseIDs.INTRO_TO_AI,
+    otherCourseIDs.ARTIFICIAL_INTELLIGENCE_1,
+    otherCourseIDs.ARTIFICIAL_INTELLIGENCE_2,
+    otherCourseIDs.ALGEBRA,
+    otherCourseIDs.CAREER_READINESS,
+    otherCourseIDs.CAREER_READINESS_2,
+    otherCourseIDs.ENGLISH_LANGUAGE_ARTS,
+    otherCourseIDs.COMPUTER_SCIENCE,
+    otherCourseIDs.AI_EXPLORATIONS,
+    otherCourseIDs.AI_SANDBOX,
   ]
 
   hourOfCodeOptions = {
@@ -412,8 +424,17 @@ const COCO_COURSE_IDS = [
   allCourseIDs.COMPUTER_SCIENCE_5,
   allCourseIDs.COMPUTER_SCIENCE_6,
 ]
+const GD_COURSE_IDS = [
+  allCourseIDs.GAME_DEVELOPMENT_1,
+  allCourseIDs.GAME_DEVELOPMENT_2,
+  allCourseIDs.GAME_DEVELOPMENT_3,
+]
+const WD_COURSE_IDS = [
+  allCourseIDs.WEB_DEVELOPMENT_1,
+  allCourseIDs.WEB_DEVELOPMENT_2,
+]
 
-const freeCocoCourseIDs = [allCourseIDs.JUNIOR, allCourseIDs.INTRODUCTION_TO_COMPUTER_SCIENCE, allCourseIDs.HACKSTACK]
+const freeCocoCourseIDs = [allCourseIDs.JUNIOR, allCourseIDs.INTRODUCTION_TO_COMPUTER_SCIENCE, allCourseIDs.INTRO_TO_AI]
 const allFreeCourseIDs = [...freeCocoCourseIDs, allCourseIDs.CHAPTER_ONE]
 
 const courseNumericalStatus = {};
@@ -447,8 +468,8 @@ courseAcronyms[allCourseIDs.CHAPTER_FOUR] = 'CH4'
 courseAcronyms[allCourseIDs.HACKSTACK] = 'AI'
 courseAcronyms[HACKSTACK_COURSE_IDS_MAP.INTRO_TO_AI] = 'INTRO'
 courseAcronyms[HACKSTACK_COURSE_IDS_MAP.ENGLISH_LANGUAGE_ARTS] = 'ELA'
-courseAcronyms[HACKSTACK_COURSE_IDS_MAP.MATH_AND_STATISTICS] = 'MATH'
-courseAcronyms[HACKSTACK_COURSE_IDS_MAP.CAREER_READINESS] = 'CR'
+courseAcronyms[HACKSTACK_COURSE_IDS_MAP.ALGEBRA] = 'ALGEBRA'
+courseAcronyms[HACKSTACK_COURSE_IDS_MAP.CAREER_READINESS] = 'CR1'
 courseAcronyms[HACKSTACK_COURSE_IDS_MAP.ARTIFICIAL_INTELLIGENCE_1] = 'AI1'
 courseAcronyms[HACKSTACK_COURSE_IDS_MAP.COMPUTER_SCIENCE] = 'CS'
 courseAcronyms[HACKSTACK_COURSE_IDS_MAP.ARTIFICIAL_INTELLIGENCE_2] = 'AI2'
@@ -474,6 +495,16 @@ courseCampaignSlugs[allCourseIDs.CHAPTER_TWO] = 'chapter-2-the-moon-dancers'
 courseCampaignSlugs[allCourseIDs.CHAPTER_THREE] = 'chapter-3-the-phoenix-lands'
 courseCampaignSlugs[allCourseIDs.CHAPTER_FOUR] = 'chapter-4-the-final-code'
 courseCampaignSlugs[allCourseIDs.HACKSTACK] = 'hackstack'
+courseCampaignSlugs[allCourseIDs.INTRO_TO_AI] = 'intro-to-ai'
+courseCampaignSlugs[allCourseIDs.ENGLISH_LANGUAGE_ARTS] = 'english-language-arts'
+courseCampaignSlugs[allCourseIDs.ALGEBRA] = 'algebra'
+courseCampaignSlugs[allCourseIDs.CAREER_READINESS] = 'career-readiness'
+courseCampaignSlugs[allCourseIDs.ARTIFICIAL_INTELLIGENCE_1] = 'artificial-intelligence-1'
+courseCampaignSlugs[allCourseIDs.COMPUTER_SCIENCE] = 'computer-science-ai'
+courseCampaignSlugs[allCourseIDs.ARTIFICIAL_INTELLIGENCE_2] = 'artificial-intelligence-2'
+courseCampaignSlugs[allCourseIDs.CAREER_READINESS_2] = 'career-readiness-2'
+courseCampaignSlugs[allCourseIDs.AI_SANDBOX] = 'ai-sandbox'
+courseCampaignSlugs[allCourseIDs.AI_EXPLORATIONS] = 'ai-explorations'
 
 const registerHocProgressModalCheck = function () {
   let hocProgressModalCheck
@@ -1417,14 +1448,14 @@ const arenas = [
   { season: 13, slug: 'pawns-passage', type: 'regular', start: new Date('2025-01-01T00:00:00.000-08:00'), end: new Date('2025-06-01T00:00:00.000-07:00'), results: new Date('2025-06-14T07:00:00.000-07:00'), levelOriginal: '675a76867ea2b689e0f86e87', image: '/file/db/level/675a76867ea2b689e0f86e87/PawnsPassageBanner.jpg', tournament: '6810a48b4fb20ed54d4ddc7d' },
   { season: 13, slug: 'kings-gambit', type: 'championship', start: new Date('2025-05-01T00:00:00.000-07:00'), end: new Date('2025-06-01T00:00:00.000-07:00'), results: new Date('2025-06-10T07:00:00.000-07:00'), levelOriginal: '679b1495454eb6d46f27e050', image: '/file/db/level/679b1495454eb6d46f27e050/KingsGambit.jpg', tournament: '6810a617882c6fe46452003d' },
   // Summer we have one arena as breakup
-  { season: 14, slug: 'turbo-track', noResults: true, type: 'regular', start: new Date('2025-06-01T00:00:00.000-08:00'), end: new Date('2025-06-01T01:00:00.000-08:00'), results: new Date('2025-06-10T07:00:00.000-08:00'), levelOriginal: '682aef505b4bd67fa522f11d', image: '/file/db/level/682aef505b4bd67fa522f11d/Grand%20Prix%20banner.jpg' },
+  // { season: 14, slug: 'turbo-track', noResults: true, type: 'regular', start: new Date('2025-06-01T00:00:00.000-08:00'), end: new Date('2025-06-01T01:00:00.000-08:00'), results: new Date('2025-06-10T07:00:00.000-08:00'), levelOriginal: '682aef505b4bd67fa522f11d', image: '/file/db/level/682aef505b4bd67fa522f11d/Grand%20Prix%20banner.jpg' },
   { season: 14, slug: 'grand-prix', noResults: true, type: 'championship', arcade: true, start: new Date('2025-06-01T00:00:00.000-08:00'), end: new Date('2025-07-31T23:59:59.000-08:00'), results: new Date('2025-08-10T07:00:00.000-08:00'), levelOriginal: '682aef505b4bd67fa522f11d', image: '/file/db/level/682aef505b4bd67fa522f11d/Grand%20Prix%20banner.jpg', noRegular: true },
   // Autumn we skip warm up arena and go straight to championship
-  { season: 15, slug: 'strikers-stadium', noResults: true, type: 'regular', start: new Date('2025-08-01T00:00:00.000-07:00'), end: new Date('2025-08-01T00:00:01.000-07:00'), results: new Date('2025-12-20T07:00:00.000-07:00'), levelOriginal: '68493b715562817aef7dea31', image: '/file/db/level/68493b715562817aef7dea31/Golden%20Goal%20Blitz%20Banner%20(1).png' },
+  // { season: 15, slug: 'strikers-stadium', noResults: true, type: 'regular', start: new Date('2025-08-01T00:00:00.000-07:00'), end: new Date('2025-08-01T00:00:01.000-07:00'), results: new Date('2025-12-20T07:00:00.000-07:00'), levelOriginal: '68493b715562817aef7dea31', image: '/file/db/level/68493b715562817aef7dea31/Golden%20Goal%20Blitz%20Banner%20(1).png' },
   { season: 15, slug: 'golden-goal', type: 'championship', start: new Date('2025-08-01T00:00:01.000-07:00'), end: new Date('2026-01-01T08:00:00.000Z'), results: new Date('2026-01-15T07:00:00.000-07:00'), levelOriginal: '68493b715562817aef7dea31', image: '/file/db/level/68493b715562817aef7dea31/Golden%20Goal%20Blitz%20Banner%20(1).png', tournament: '695383474e840b3f4aa401d3' },
   { season: 16, slug: 'devour-dash', type: 'championship', start: new Date('2026-01-13T00:00:00.000-08:00'), end: new Date('2026-05-30T00:00:00.000-08:00'), results: new Date('2026-06-15T07:00:00.000-08:00'), levelOriginal: '69415fa85459d73effdd5c51', image: '/file/db/level/69415fa85459d73effdd5c51/DevourDashCupBanner.webp', tournament: '', onePerSeason: true },
   { season: 17, slug: 'gridlock-practice', type: 'championship', start: new Date('2026-05-31T00:00:00.000-08:00'), end: new Date('2026-08-01T00:00:00.000-08:00'), results: new Date('2026-08-15T07:00:00.000-08:00'), levelOriginal: '', image: '', tournament: '', onePerSeason: true, noResults: true, restArena: true },
-  { season: 18, slug: 'chaotic-crossing', type: 'championship', start: new Date('2026-08-01T00:00:00.000-08:00'), end: new Date('2026-12-29T00:00:00.000-08:00'), results: new Date('2027-01-15T07:00:00.000-08:00'), levelOriginal: '', image: '', tournament: '', onePerSeason: true},
+  { season: 18, slug: 'chaotic-crossing', type: 'championship', start: new Date('2026-08-01T00:00:00.000-08:00'), end: new Date('2026-12-29T00:00:00.000-08:00'), results: new Date('2027-01-15T07:00:00.000-08:00'), levelOriginal: '', image: '', tournament: '', onePerSeason: true },
 ]
 
 // AI League seasons
@@ -1443,8 +1474,8 @@ const AILeagueSeasons = [
   { number: 11, championshipType: 'blitz', image: '/images/pages/league/sunfire-blitz.png', imagePath: '/images/pages/league/sunfire-results.webp', topMatchUrlPath: '/play/spectate/sunfire?session-one=6688815921af79d80736c0e2&session-two=66c64ee0b522c4f39324d832&tournament=669aa78fcca07ea127d445d6' },
   { number: 12, championshipType: 'clash', image: '/images/pages/league/supercharged-clash.png', imagePath: '/images/pages/league/supercharged-results.webp', topMatchUrlPath: '/play/spectate/supercharged?session-one=670022a88716adfc389b7843&session-two=6774cf6654ce86ae1fa25620&tournament=6756bac52bfcb2c7059f3cb3' },
   { number: 13, championshipType: 'cup', image: '/images/pages/league/kings-gambit-cup.png', imagePath: '/images/pages/league/kings-gambit-results.png', topMatchUrlPath: '/play/spectate/kings-gambit?session-one=67a8ef80800a161b01ff982f&session-two=683abaaac26f8d7dad1209f4&tournament=6810a617882c6fe46452003d' },
-  { number: 14, championshipType: 'clash', image: '/images/pages/league/ail_practice_arena.webp', video: '', videoThumbnailTime: '', noResults: true, restSeason: true },
-  { number: 15, championshipType: 'blitz', image: '/images/pages/league/golden-goal-blitz.png', video: '', videoThumbnailTime: '' },
+  { number: 14, championshipType: 'clash', image: '/images/pages/league/ail_practice_arena.webp', imagePath: '/images/pages/league/racing-rivals-results.png', topMatchUrlPath: '/play/ladder/grand-prix', restSeason: true },
+  { number: 15, championshipType: 'blitz', image: '/images/pages/league/golden-goal-blitz.png', imagePath: '/images/pages/league/soccer-showdown-results.png', topMatchUrlPath: '/play/spectate/golden-goal?session-one=688c73f5143d7ea07a1b923f&session-two=688cf6bcbda8eeb9912f5ed9&tournament=695383474e840b3f4aa401d3', video: '', videoThumbnailTime: '' },
   { number: 16, championshipType: 'cup', image: '/images/pages/league/devour-dash-cup.webp', video: '', videoThumbnailTime: '' },
   { number: 17, championshipType: 'arena', image: '/images/pages/league/ail_practice_arena.webp', video: '', videoThumbnailTime: '', restSeason: true, noResults: true },
   { number: 18, championshipType: 'clash', image: '/images/pages/league/chaotic-crossing-clash.webp', video: '', videoThumbnailTime: '' },
@@ -1813,6 +1844,9 @@ module.exports.getJuniorUrl = function () {
   if (me && me.isTeacher() && !me.isAnonymous()) {
     juniorPath = '/teachers/guide/junior'
   }
+  if (me?.getOdysseyExperimentValue?.() === 'beta') {
+    juniorPath = '/play/odyssey'
+  }
   return `${cocoBaseURL()}${juniorPath}`
 }
 
@@ -1995,6 +2029,9 @@ module.exports = {
   HACKSTACK_COURSE_IDS,
   COCO_COURSE_IDS,
   OZ_COURSE_IDS,
+  OZ_COURSE_IDS_MAP,
+  GD_COURSE_IDS,
+  WD_COURSE_IDS,
   showOzaria,
 }
 

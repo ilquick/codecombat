@@ -124,11 +124,9 @@ module.exports = (CocoRouter = (function () {
         'admin/outcomes-report': go('admin/OutcomesReportView'),
         'admin/clan(/:clanID)': go('core/SingletonAppVueComponentView'),
         'admin/low-usage-users': go('core/SingletonAppVueComponentView'),
-        'admin/trial-classes': go('core/SingletonAppVueComponentView'),
         'admin/activation-code-usage': go('core/SingletonAppVueComponentView'),
 
         announcements: go('core/SingletonAppVueComponentView'),
-        'event-calendar(/*subpath)': go('core/SingletonAppVueComponentView'),
 
         'exams/(*subpath)': go('core/SingletonAppVueComponentView'),
 
@@ -319,6 +317,7 @@ module.exports = (CocoRouter = (function () {
         },
 
         hackstack: go('core/SingletonAppVueComponentView'),
+        'hackstack-algebra': go('core/SingletonAppVueComponentView'),
 
         'home-beta': go('core/SingletonAppVueComponentView'),
         ozaria () {
@@ -541,7 +540,7 @@ module.exports = (CocoRouter = (function () {
         'teachers/resources_new': go('core/SingletonAppVueComponentView'),
         'teachers/curriculum': teacherProxyRoute(go('teachers/curriculum', { redirectStudents: true })),
         'teachers/curriculum/:campaign': teacherProxyRoute(go('teachers/curriculum', { redirectStudents: true })),
-        'teachers/guide/:product': teacherProxyRoute(go('core/SingletonAppVueComponentView'), { redirectStudents: true }),
+        'teachers/guide/:product(/*subpath)': teacherProxyRoute(go('core/SingletonAppVueComponentView'), { redirectStudents: true }),
         'teachers/resources/ap-cs-principles': go('teachers/ApCsPrinciplesView', { redirectStudents: true }),
         'teachers/resources/:name': go('teachers/MarkdownResourceView', { redirectStudents: true }),
         'teachers/professional-development': teacherProxyRoute(go('pd/PDView', { redirectStudents: true })),
@@ -560,9 +559,6 @@ module.exports = (CocoRouter = (function () {
           if (me.isStudent() && !me.isAdmin()) { return this.navigate('/students', { trigger: true, replace: true }) }
           return this.routeDirectly('teachers/ConvertToTeacherAccountView', [])
         },
-
-        'trial-classes/:eventId/confirm/:token': go('core/SingletonAppVueComponentView'),
-        'trial-classes': go('core/SingletonAppVueComponentView'),
 
         'school-administrator(/*subpath)': go('core/SingletonAppVueComponentView'),
         'cinematicplaceholder/:levelSlug': go('core/SingletonAppVueComponentView'),
