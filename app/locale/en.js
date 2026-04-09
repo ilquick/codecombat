@@ -4890,6 +4890,8 @@ module.exports = {
       curriculum_coco: 'CodeCombat',
       curriculum_ozaria: 'Ozaria',
       curriculum_beta: 'Beta',
+      progress_last_fetched: 'Progress last fetched',
+      refresh_progress_helptext: 'Student progress may take 2–3 minutes to sync after completion.',
     },
 
     outcomes: {
@@ -6396,6 +6398,7 @@ module.exports = {
       ScenarioDetailsPanel_released: 'Released',
       'ScenarioDetailsPanel_save-scenario': 'Save Scenario',
       'ScenarioDetailsPanel_scenario-settings': 'Scenario settings',
+      'ScenarioDetailsPanel_allow-user-upload-file': 'Allow user to upload file',
       'ScenarioPage_youre-in-scenario-creation-mode-go-ahead': "You're in scenario creation mode! Go ahead, mess around and try to build a cool scenario, then click \"beta\" or \"released\" to share it with the world! If you ever don't like a prompt, just go back and edit it.",
       'ScenarioPromptMessage_alternate-choices': 'Alternate Choices',
       ScenarioPromptMessage_edit: 'Edit',
@@ -6485,6 +6488,7 @@ module.exports = {
       ready_to_review_helptext: 'Mark this when your project is complete. Your teacher will then see it as ready to review on their side.',
       ready_to_review_confirm_text: 'Ready to Submit? Click OK to notify your teacher to review your project.',
       no_course_instances: 'You do not have any course instances. Please contact your teacher to get access to the AI Hackstack.',
+      restart_scenario_confirm: 'Your progress will be lost. Are you sure you want to restart?',
     },
     galaxy: {
       title: 'Welcome to HackStack Galaxy',
